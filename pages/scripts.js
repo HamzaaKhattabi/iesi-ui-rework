@@ -1,24 +1,24 @@
 import {withAuth} from "../lib/withAuth";
-import {requestWrapper} from "../lib/requestWrapper";
 import useSWR from 'swr'
-import {getSession} from "next-auth/react";
+import {requestWrapper} from "../lib/requestWrapper";
 
-function Scripts({ scriptPage, session }) {
-    const { data, error } = useSWR('/scripts', requestWrapper(session))
+function Scripts() {
+    const { data, error } = useSWR('http://localhost:8080/api/scripts', requestWrapper())
 
-    console.log('error: ', error)
-    if (error) return <p>Failed to load: {error.error_description}</p>
-    if (!data) return <p>Loading data ..</p>
+    if (error) {
+        return <p>{error.error_description}</p>
+    }
 
     return <p>Script page</p>
 }
 
-export const getServerSideProps = withAuth(async context => {
+export const getServerSideProps = withAuth(context => {
     return {
         props: {
-            session: await getSession(context)
+
         }
     }
 })
+
 
 export default Scripts

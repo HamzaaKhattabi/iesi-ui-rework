@@ -2,19 +2,57 @@ import NextAuth from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import axios from "axios";
 
+
+async function refreshAccessToken(token) {
+    try {
+        const response = await axios.post('http://localhost:8080/api/oauth/token?' + new URLSearchParams({
+            'grant_type': 'refresh_token',
+            'client_id': 'iesi',
+            'client_secret': 'iesi',
+            'refresh_token': token.refreshToken
+        }))
+
+        console.log('new expire at: ', new Date(Date.now() + response.data.expires_in * 1000))
+        return {
+            ...token,
+            accessToken: response.data.access_token,
+            accessTokenExpireAt: new Date(Date.now() + response.data.expires_in * 1000),
+            refreshToken: response.data.refresh_token ?? token.refreshToken,
+        }
+    } catch (e) {
+        return {
+            ...token,
+            error: 'RefreshAccessTokenError'
+        }
+    }
+}
+
+
 export const authOptions = {
     pages: {
         signIn: '/users/login',
     },
+    secret: process.env.NEXTAUTH_SECRET,
     callbacks: {
-        jwt: async ({ token, user}) => {
-            if (user) {
-                token.accessToken = user.access_token
+        jwt: async ({ token, user, account}) => {
+            if (account && user) {
+                return {
+                    accessToken: user.access_token,
+                    accessTokenExpireAt: new Date(Date.now() + user.expires_in * 1000),
+                    refreshToken: user.refresh_token,
+                }
             }
+
+            if (new Date(Date.now()) >= new Date(token.accessTokenExpireAt)) {
+                return await refreshAccessToken(token);
+            }
+
             return token;
         },
         session: async ({ session, token }) => {
             session.accessToken = token.accessToken
+            session.user = null;
+            session.error = token.error ?? null;
             return session;
         },
     },
